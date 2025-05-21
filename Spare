@@ -1,0 +1,138 @@
+using UnityEngine;
+
+public class playerController : MonoBehaviour
+{
+    [Header("Movement")]
+    public Transform orientaiation;
+    public float groundDrag;
+    public float moveSpeed;
+    public float walkSpeed;
+    public float sprintSpeed;
+    float horizontalInput;
+    float verticalInput;
+    public float jumpForce;
+    public float jumpCooldown;
+    public float airMultiplier;
+    bool readyToJump;
+    public float jumpPower = 7f;
+    public float wallrunSpeed;
+
+
+    [Header("Keybinds")]
+    public KeyCode jumpKey = KeyCode.Space;
+    
+    [Header("Ground check")]
+
+    Vector3 moveDirection;
+    Rigidbody rb;
+    public float PlayerHeight;
+    public LayerMask whatIsGround;
+    // Start is called once before the first execution of Update after the MonoBehaviour is created
+    private void Start()
+    {
+        rb = GetComponent<Rigidbody>();
+        rb.freezeRotation = true; // Prevent the rigidbody from rotating
+        readyToJump = true; // Set the jump cooldown to true
+    }
+    public void StateHandler()
+    {
+        if (wallrunning)
+        {
+            state = MovementMode.wallrunning; // Set the state to wallrunning
+            moveSpeed = wallrunSpeed; // Set the desired move speed to wallrun speed
+        }
+    }
+        
+    public MovementMode state;
+    private bool grounded;
+    private bool wallrunning;
+
+    public enum MovementMode
+    {
+        Walking,
+        Sprinting,
+        air,
+        wallrunning
+    }
+    private void Update()
+    {
+        // Apply drag to the rigidbody when on the ground
+        if (Physics.Raycast(transform.position, Vector3.down, PlayerHeight * 0.5f + 0.2f, whatIsGround))
+            if (grounded)
+            {
+                rb.linearDamping = groundDrag; // Apply drag when on the ground
+            }
+            else
+            {
+                rb.linearDamping = 0; // No drag when in the air
+            }
+        grounded = Physics.Raycast(transform.position, Vector3.down, PlayerHeight * 0.5f + 0.3f, whatIsGround);
+        MyInput();
+        SpeedControl(); // Control the speed of the player
+    }
+    private void FixedUpdate()
+    {
+        MovePlayer();
+    }
+    // Update is called once per frame
+    private void MyInput()
+    {
+        horizontalInput = Input.GetAxis("Horizontal");
+        verticalInput = Input.GetAxis("Vertical");
+        if (Input.GetKeyDown(jumpKey) && readyToJump && grounded)
+        {
+            readyToJump = false; // Set the jump cooldown
+            Jump(); // Call the jump function
+            Invoke(nameof(ResetJump), jumpCooldown); // Reset the jump cooldown after a delay
+
+        }
+    }
+    private void MovePlayer()
+    {
+        moveDirection = (orientaiation.forward * verticalInput + orientaiation.right * horizontalInput).normalized;
+        {
+            if (grounded)
+            {
+                rb.AddForce(moveDirection * moveSpeed * 10f, ForceMode.Force); // Apply force to the rigidbody
+            }
+            else
+            {
+                rb.AddForce(moveDirection * moveSpeed * 10f * airMultiplier, ForceMode.Force); // Apply force to the rigidbody in the air
+            } 
+        }
+
+        rb.AddForce(moveDirection * 10f, ForceMode.Force); // Apply force to the rigidbody
+    }
+
+    private void SpeedControl()
+    {
+        Vector3 flatVel = new Vector3(rb.linearVelocity.x, 100f, rb.linearVelocity.z); // Get the flat velocity (ignore y component)
+        if (flatVel.magnitude > moveSpeed)
+        {
+            Vector3 limitedVel = flatVel.normalized * moveSpeed; // Limit the velocity to moveSpeed
+            rb.linearVelocity = new Vector3(limitedVel.x, rb.linearVelocity.y, limitedVel.z); // Apply the limited velocity to the rigidbody
+        }
+    }
+    private void Jump()
+    {
+        // Reset the y velocity to 0 by creating a new velocity vector
+        Vector3 currentVelocity = rb.linearVelocity;
+        currentVelocity.y = 0f;
+        rb.linearVelocity = currentVelocity;
+
+        // Apply an impulse force to the rigidbody
+        rb.AddForce(transform.up * jumpForce, ForceMode.Impulse);
+    }
+    private void ResetJump()
+    {
+        readyToJump = true; // Reset the jump cooldown
+    }
+    private void OnDrawGizmos()
+    {
+        Gizmos.color = Color.red;
+        Gizmos.DrawWireSphere(transform.position, PlayerHeight * 0.5f + 0.3f); // Draw a wire sphere to visualize the ground check
+    }
+
+
+}
+
